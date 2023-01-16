@@ -168,7 +168,8 @@ impl NodeManagerWorker {
                 .and_then(|p| {
                     if let Some(p) = p.cast::<Project>() {
                         node_manager
-                            .projects
+                            .projects()
+                            .unwrap()
                             .get(&*p)
                             .map(|info| info.id.to_string())
                     } else {
