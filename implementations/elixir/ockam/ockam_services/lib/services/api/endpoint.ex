@@ -123,7 +123,6 @@ defmodule Ockam.Services.API.Endpoint do
         end
       end
 
-      @impl true
       defp authorize(_auth_type, _req, _bindings), do: true
 
       defoverridable authorize: 3
