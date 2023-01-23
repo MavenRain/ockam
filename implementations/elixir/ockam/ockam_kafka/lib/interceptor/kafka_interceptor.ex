@@ -1,8 +1,6 @@
 defmodule Ockam.Kafka.Interceptor do
   @behaviour Ockam.Transport.Portal.Interceptor
 
-  alias Ockam.Kafka.Interceptor.Handler
-
   alias Ockam.Kafka.Interceptor.Protocol.Parser
 
   alias Ockam.Kafka.Interceptor.Protocol.RequestHeader
@@ -12,32 +10,41 @@ defmodule Ockam.Kafka.Interceptor do
   require Logger
 
   @impl true
-  def setup(_options, state) do
+  def setup(options, state) do
+    ## TODO: move outlet_prefix and base port to a separate config
+    outlet_prefix = Keyword.get(options, :outlet_prefix, "kafka_outlet_")
+    base_port = Keyword.get(options, :base_port, 9001)
+    request_handlers = Keyword.get(options, :request_handlers, [])
+    response_handlers = Keyword.get(options, :response_handlers, [])
     correlations = %{}
-    ## FIXME: move that to inlet manager
-    inlets = %{}
-    {:ok, Map.put(state, :correlations, correlations) |> Map.put(:inlets, inlets)}
+    {:ok,
+      Map.put(state, :correlations, correlations)
+      |> Map.put(:request_handlers, request_handlers)
+      |> Map.put(:response_handlers, response_handlers)
+      |> Map.put(:outlet_prefix, outlet_prefix)
+      |> Map.put(:base_port, base_port)
+    }
   end
 
   ## Kafka requests
   @impl true
-  def handle_inlet_payload(tunnel_payload, state) do
+  def handle_outer_payload(tunnel_payload, state) do
     process_kafka_payload(:request, tunnel_payload, state)
   end
 
   ## Kafka responses
   @impl true
-  def handle_outlet_payload(tunnel_payload, state) do
+  def handle_inner_payload(tunnel_payload, state) do
     process_kafka_payload(:response, tunnel_payload, state)
   end
 
   @impl true
-  def handle_inlet_signal(_signal, state) do
+  def handle_outer_signal(_signal, state) do
     {:ok, state}
   end
 
   @impl true
-  def handle_outlet_signal(_signal, state) do
+  def handle_inner_signal(_signal, state) do
     {:ok, state}
   end
 
@@ -127,7 +134,7 @@ defmodule Ockam.Kafka.Interceptor do
            Parser.parse_response_header(response_header_version, request_header, response),
          {:ok, response_content, <<>>} <-
            Parser.parse_response_data(api_key, api_version, response_data) do
-      case Handler.handle_kafka_response(response_header, response_content, state) do
+      case handle_kafka_response(response_header, response_content, state) do
         {:ok, state} ->
           {:ok, response, state}
 
@@ -146,6 +153,14 @@ defmodule Ockam.Kafka.Interceptor do
           {:error, reason}
       end
     end
+  end
+
+  defp handle_kafka_response(response_header, response_content, %{response_handlers: handlers} = state) do
+    Enum.reduce(handlers, {:ok, state},
+      fn(handler, {:ok, state}) -> handler.(response_header, response_content, state);
+        (handler, {:ok, prev_response, state}) -> handler.(response_header, prev_response, state);
+        (_handler, {:error, reason}) -> {:error, reason}
+      end)
   end
 
   @spec process_kafka_request(binary(), state :: map()) ::
@@ -172,7 +187,7 @@ defmodule Ockam.Kafka.Interceptor do
            ),
          {:ok, request_content, <<>>} <-
            Parser.parse_request_data(api_key, api_version, request_data) do
-      case Handler.handle_kafka_request(request_header, request_content, state) do
+      case handle_kafka_request(request_header, request_content, state) do
         {:ok, state} ->
           {:ok, request, state}
 
@@ -193,6 +208,15 @@ defmodule Ockam.Kafka.Interceptor do
     end
   end
 
+  defp handle_kafka_request(request_header, request_content, %{request_handlers: handlers} = state) do
+    Enum.reduce(handlers, {:ok, state},
+      fn(handler, {:ok, state}) -> handler.(request_header, request_content, state);
+        (handler, {:ok, prev_request, state}) -> handler.(request_header, prev_request, state);
+        (_handler, {:error, reason}) -> {:error, reason}
+      end)
+  end
+
+
   ## Currently we don't modify requests, hence we don't support reconstructing form struct
   @spec reconstruct_request(binary(), request :: any()) ::
           {:ok, binary()} | {:error, reason :: any()}
@@ -200,7 +224,6 @@ defmodule Ockam.Kafka.Interceptor do
     {:error, {:unsupported_request, request}}
   end
 
-  ## Currently we don't modify responses, hence we don't support reconstructing form struct
   @spec reconstruct_response(binary(), response :: any()) ::
           {:ok, binary()} | {:error, reason :: any()}
   def reconstruct_response(header_binary, %MetadataResponse{} = response) do

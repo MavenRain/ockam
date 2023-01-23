@@ -45,6 +45,24 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Parser do
     end
   end
 
+  ## FIXME: what should we do for api versions higher than supported??
+  def parse_request_data(@api_metadata, api_version, data) do
+    MetadataRequest.Parser.parse(api_version, data)
+  end
+
+  def parse_request_data(other, api_version, _data) do
+    {:error, {:unsupported_api, {other, api_version}}}
+  end
+
+  def parse_response_data(@api_metadata, api_version, data) do
+    MetadataResponse.Parser.parse(api_version, data)
+  end
+
+  def parse_response_data(other, api_version, _data) do
+    {:error, {:unsupported_api, {other, api_version}}}
+  end
+
+
   def parse_response_correlation_id(data) do
     parse_type(:int32, data)
   end
@@ -107,23 +125,6 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Parser do
 
   def parse_response_header(header_version, _request_header, response) do
     {:error, {:response_header_error, :cannot_parse_response_header, header_version, response}}
-  end
-
-  ## FIXME: what should we do for api versions higher than supported??
-  def parse_request_data(@api_metadata, api_version, data) do
-    MetadataRequest.Parser.parse(api_version, data)
-  end
-
-  def parse_request_data(other, api_version, _data) do
-    {:error, {:unsupported_api, {other, api_version}}}
-  end
-
-  def parse_response_data(@api_metadata, api_version, data) do
-    MetadataResponse.Parser.parse(api_version, data)
-  end
-
-  def parse_response_data(other, api_version, _data) do
-    {:error, {:unsupported_api, {other, api_version}}}
   end
 
   @spec parse_type(atom() | (binary() -> {:ok, any(), binary()} | {:error, any()}), binary()) ::

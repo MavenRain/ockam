@@ -11,41 +11,52 @@ defmodule Ockam.Transport.Portal.Interceptor do
   @callback setup(options::Keyword.t, state::map()) :: {:ok, state::map()} | {:error, reason::any()}
 
   @doc """
-  Process intercepted payload from inlet.
+  Process intercepted payload from outer worker.
   Returns:
    - {:ok, state} - will forward original payload
    - {:ok, payload, state} - will replace intercepted payload
    - {:error, reason} - will not forward the payload
   """
-  @callback handle_inlet_payload(payload::binary(), state::map()) :: {:ok, state::map()} | {:ok, payload::binary(), state::map()} | {:error, reason::any()}
+  @callback handle_outer_payload(payload::binary(), state::map()) :: {:ok, state::map()} | {:ok, payload::binary(), state::map()} | {:error, reason::any()}
   @doc """
-  Process intercepted payload from outlet.
+  Process intercepted payload from inner worker.
   Returns:
    - {:ok, state} - will forward original payload
    - {:ok, payload, state} - will replace intercepted payload
    - {:error, reason} - will not forward the payload
   """
-  @callback handle_outlet_payload(payload::binary(), state::map()) :: {:ok, state::map()} | {:ok, payload::binary(), state::map()} | {:error, reason::any()}
+  @callback handle_inner_payload(payload::binary(), state::map()) :: {:ok, state::map()} | {:ok, payload::binary(), state::map()} | {:error, reason::any()}
   @doc """
-  Process intercepted signal from inlet (:ping, :pong, :disconnect).
+  Process intercepted signal from outer worker (:ping, :pong, :disconnect).
   Returns:
    - {:ok, state} - will forward original signal
    - {:error, reason} - will not forward the signal
   """
-  @callback handle_inlet_signal(signal::any(), state::map()) :: {:ok, state::map()} | {:error, reason::any()}
+  @callback handle_outer_signal(signal::any(), state::map()) :: {:ok, state::map()} | {:error, reason::any()}
   @doc """
-  Process intercepted signal from outlet (:ping, :pong, :disconnect).
+  Process intercepted signal from inner worker (:ping, :pong, :disconnect).
   Returns:
    - {:ok, state} - will forward original signal
    - {:error, reason} - will not forward the signal
   """
-  @callback handle_outlet_signal(signal::any(), state::map()) :: {:ok, state::map()} | {:error, reason::any()}
+  @callback handle_inner_signal(signal::any(), state::map()) :: {:ok, state::map()} | {:error, reason::any()}
 
   @impl true
   def inner_setup(options, state) do
     interceptor_mod = Keyword.fetch!(options, :interceptor_mod)
-    case interceptor_mod.setup(options, state) do
+    interceptor_options = Keyword.get(options, :interceptor_options, [])
+    case interceptor_mod.setup(interceptor_options, state) do
       {:ok, state} ->
+        case Keyword.fetch(options, :init_message) do
+          {:ok, message} ->
+            ## Interceptor is spawned by Ockam.Session.Spawner
+            ## init message is forwarded
+            Message.forward(message)
+            |> Message.trace(state.inner_address)
+            |> Router.route()
+          :error ->
+            :ok
+        end
         {:ok, Map.put(state, :interceptor_mod, interceptor_mod)}
       {:error, reason} ->
         {:error, reason}
@@ -54,7 +65,7 @@ defmodule Ockam.Transport.Portal.Interceptor do
 
   @impl true
   def handle_outer_message(%Message{payload: payload} = message, state) do
-    with {:ok, new_payload, state} <- handle_tunnel_message(:inlet, payload, state) do
+    with {:ok, new_payload, state} <- handle_tunnel_message(:outer, payload, state) do
       new_message =
         message
         |> Message.forward()
@@ -68,7 +79,7 @@ defmodule Ockam.Transport.Portal.Interceptor do
 
   @impl true
   def handle_inner_message(%Message{payload: payload} = message, state) do
-    with {:ok, new_payload, state} <- handle_tunnel_message(:outlet, payload, state) do
+    with {:ok, new_payload, state} <- handle_tunnel_message(:inner, payload, state) do
       new_message =
         message
         |> Message.forward()
@@ -111,14 +122,14 @@ defmodule Ockam.Transport.Portal.Interceptor do
 
   def handle_payload(type, data, %{interceptor_mod: interceptor_mod} = state) do
     case type do
-      :inlet -> interceptor_mod.handle_inlet_payload(data, state)
-      :outlet -> interceptor_mod.handle_outlet_payload(data, state)
+      :outer -> interceptor_mod.handle_outer_payload(data, state)
+      :inner -> interceptor_mod.handle_inner_payload(data, state)
     end
   end
   def handle_signal(type, data, %{interceptor_mod: interceptor_mod} = state) do
     case type do
-      :inlet -> interceptor_mod.handle_inlet_signal(data, state)
-      :outlet -> interceptor_mod.handle_outlet_signal(data, state)
+      :outer -> interceptor_mod.handle_outer_signal(data, state)
+      :inner -> interceptor_mod.handle_inner_signal(data, state)
     end
   end
 end
