@@ -13,6 +13,8 @@ use clap::{Args, Subcommand};
 
 use crate::{util::api::CloudOpts, CommandGlobalOpts};
 
+use self::revoke::RevokeCommand;
+
 #[derive(Clone, Debug, Args)]
 #[command(arg_required_else_help = true, subcommand_required = true)]
 pub struct LeaseCommand {
@@ -38,6 +40,7 @@ pub enum LeaseSubcommand {
     Create(CreateCommand),
     List(ListCommand),
     Show(ShowCommand),
+    Revoke(RevokeCommand),
 }
 
 impl LeaseCommand {
@@ -46,6 +49,7 @@ impl LeaseCommand {
             LeaseSubcommand::Create(c) => c.run(options, self.lease_args),
             LeaseSubcommand::List(c) => c.run(options, self.lease_args),
             LeaseSubcommand::Show(c) => c.run(options, self.lease_args),
+            LeaseSubcommand::Revoke(c) => c.run(options, self.lease_args),
         }
     }
 }

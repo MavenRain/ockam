@@ -2,17 +2,15 @@ use std::str::FromStr;
 
 use clap::Args;
 use ockam::Context;
-use ockam_api::cloud::{lease_manager::models::influxdb::RevokeTokenRequest, CloudRequestWrapper};
+use ockam_api::cloud::lease_manager::models::influxdb::RevokeTokenRequest;
 use ockam_core::api::Request;
 use ockam_multiaddr::MultiAddr;
 
 use crate::{
     lease::LeaseArgs,
-    node::util::delete_embedded_node,
-    util::{node_rpc, orchestrator_api::OrchestratorApiBuilder, Rpc},
+    util::{node_rpc, orchestrator_api::OrchestratorApiBuilder},
     CommandGlobalOpts,
 };
-use anyhow::Context as _;
 
 /// InfluxDB Token Manager Add On
 #[derive(Clone, Debug, Args)]
@@ -38,14 +36,13 @@ async fn run_impl(
         .await?
         .with_project_from_file(&lease_args.project)
         .await?
-        .build(&MultiAddr::from_str("/service")?)
+        .build(&MultiAddr::from_str("/service/influxdb_token_lease")?)
         .await?;
     let body = RevokeTokenRequest::new(cmd.token_id.clone());
 
-    let req =
-        Request::delete(format!("/lease_manager/influxdb/tokens/{}", cmd.token_id)).body(body);
+    let req = Request::delete(format!("/{}", cmd.token_id)).body(body);
 
-    // TOOD: add or change structure of client to allow for requests w/o responses.
+    // TODO: add or change structure of client to allow for requests w/o responses.
     orchestrator_client.request(req).await?;
 
     println!("Revoked influxdb token {}.", cmd.token_id);

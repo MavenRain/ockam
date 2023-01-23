@@ -1,13 +1,12 @@
 use std::path::PathBuf;
 
 use crate::{
-    credential,
-    node::util::{delete_embedded_node, delete_node, start_embedded_node},
+    node::util::{delete_node, start_embedded_node},
     project::{
         util::{create_secure_channel_to_authority, create_secure_channel_to_project},
         ProjectInfo,
     },
-    util::{api, Rpc},
+    util::{Rpc},
     CommandGlobalOpts,
 };
 use anyhow::{anyhow, Result};
@@ -18,14 +17,14 @@ use ockam_api::{
     cloud::project::Project,
     config::lookup::ProjectLookup,
     nodes::models::secure_channel::{
-        CreateSecureChannelRequest, CreateSecureChannelResponse, CredentialExchangeMode,
+        CredentialExchangeMode,
     },
     DefaultAddress,
 };
-use ockam_core::api::{Request, RequestBuilder};
-use ockam_identity::{credential::Credential, IdentityIdentifier};
-use ockam_multiaddr::{proto, MultiAddr, Protocol};
-use tracing::{debug, info};
+use ockam_core::api::{RequestBuilder};
+use ockam_identity::{credential::Credential};
+use ockam_multiaddr::{MultiAddr};
+use tracing::{info};
 
 use super::RpcBuilder;
 
@@ -102,7 +101,7 @@ impl<'a> OrchestratorApiBuilder<'a> {
         let config_lookup = self.opts.config.lookup();
 
         let proj = config_lookup
-            .get_project(&proj_name)
+            .get_project(proj_name)
             .ok_or(anyhow!("Unknown project {}", proj_name.to_string()))?;
 
         self.project_lookup = Some(proj.clone());
@@ -234,6 +233,6 @@ impl<'a> OrchestratorApi<'a> {
 
         info!("Response is OK!");
 
-        Ok(self.rpc.parse_response()?)
+        self.rpc.parse_response()
     }
 }

@@ -1,6 +1,6 @@
 use clap::{Args, Subcommand};
 
-use crate::{help, CommandGlobalOpts};
+use crate::{CommandGlobalOpts};
 
 use super::{influxdb::InfluxDbCreateCommand, LeaseArgs};
 

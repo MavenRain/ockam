@@ -1,16 +1,15 @@
-use anyhow::Context as _;
+use std::str::FromStr;
+
 use clap::Args;
 use ockam::Context;
-use ockam_api::cloud::{
-    lease_manager::models::influxdb::{ShowTokenRequest, ShowTokenResponse},
-    CloudRequestWrapper,
-};
+use ockam_api::cloud::lease_manager::models::influxdb::{ShowTokenRequest, ShowTokenResponse};
+
 use ockam_core::api::Request;
+use ockam_multiaddr::MultiAddr;
 
 use crate::{
     lease::LeaseArgs,
-    node::util::delete_embedded_node,
-    util::{node_rpc, Rpc},
+    util::{node_rpc, orchestrator_api::OrchestratorApiBuilder},
     CommandGlobalOpts,
 };
 
@@ -32,44 +31,21 @@ async fn run_impl(
     ctx: Context,
     (opts, lease_args, cmd): (CommandGlobalOpts, LeaseArgs, InfluxDbShowCommand),
 ) -> crate::Result<()> {
-    // TODO: Update show with orchestrator client
+    let mut orchestrator_client = OrchestratorApiBuilder::new(&ctx, &opts)
+        .as_identity(lease_args.cloud_opts.identity)
+        .with_new_embbeded_node()
+        .await?
+        .with_project_from_file(&lease_args.project)
+        .await?
+        .build(&MultiAddr::from_str("/service/influxdb_token_lease")?)
+        .await?;
+    let body = ShowTokenRequest::new(cmd.token_id.clone());
 
-    // let controller_route = &lease_args.cloud_opts.route();
-    // let mut rpc = Rpc::embedded(&ctx, &opts).await?;
+    let req = Request::get(format!("/{}", cmd.token_id)).body(body);
 
-    // let base_endpoint = |project_name: &str| -> crate::Result<String> {
-    //     let lookup = opts.config.lookup();
-    //     let project_id = &lookup
-    //         .get_project(project_name)
-    //         .context(format!(
-    //             "Failed to get project {} from config lookup",
-    //             project_name
-    //         ))?
-    //         .id;
-    //     Ok(format!("{project_id}/lease_manager"))
-    // };
+    let resp: ShowTokenResponse = orchestrator_client.request(req).await?;
 
-    // let body = ShowTokenRequest::new(cmd.token_id.clone());
-
-    // // e.g. API Path: GET "<proj_id>/lease_manager/influxdb/tokens"
-    // // TODO: @oakley ADD ON TYPE shouldn't be a magic string
-    // let add_on_id = "influxdb";
-    // let node_api_path = format!(
-    //     "{}/{}/{}/{}",
-    //     base_endpoint(&lease_args.project_name)?,
-    //     add_on_id,
-    //     "tokens",
-    //     cmd.token_id
-    // );
-
-    // let req = Request::get(node_api_path).body(CloudRequestWrapper::new(body, controller_route));
-    // rpc.request(req).await?;
-    // rpc.is_ok()?;
-
-    // let res: ShowTokenResponse = rpc.parse_response()?;
-    // // TODO : Create View for showing token
-    // println!("Retrieving Token Info");
-
-    // delete_embedded_node(&opts, rpc.node_name()).await;
+    // TODO: Create view for showing a token
+    println!("Token details: {:?}", resp);
     Ok(())
 }

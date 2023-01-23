@@ -2,20 +2,15 @@ use std::str::FromStr;
 
 use clap::Args;
 use ockam::Context;
-use ockam_api::cloud::{
-    lease_manager::models::influxdb::{CreateTokenRequest, CreateTokenResponse},
-    CloudRequestWrapper,
-};
+use ockam_api::cloud::lease_manager::models::influxdb::{CreateTokenRequest, CreateTokenResponse};
 use ockam_core::api::Request;
 use ockam_multiaddr::MultiAddr;
 
 use crate::{
     lease::LeaseArgs,
-    node::util::delete_embedded_node,
-    util::{node_rpc, orchestrator_api::OrchestratorApiBuilder, Rpc},
+    util::{node_rpc, orchestrator_api::OrchestratorApiBuilder},
     CommandGlobalOpts,
 };
-use anyhow::Context as _;
 
 use super::InfluxDbTokenStatus;
 
@@ -67,8 +62,7 @@ async fn run_impl(
     let resp: CreateTokenResponse = orchestrator_client.request(req).await?;
 
     // TODO : Create View for showing created token info
-
-    println!("Created token within InfluxDB");
+    println!("Token Created: {:?}", resp);
 
     Ok(())
 }

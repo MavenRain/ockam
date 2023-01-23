@@ -1,19 +1,14 @@
 use std::str::FromStr;
 
-use anyhow::Context as _;
 use clap::Args;
 use ockam::Context;
-use ockam_api::cloud::{
-    lease_manager::models::influxdb::{ListTokensRequest, ListTokensResponse},
-    CloudRequestWrapper,
-};
+use ockam_api::cloud::lease_manager::models::influxdb::{ListTokensRequest, ListTokensResponse};
 use ockam_core::api::Request;
 use ockam_multiaddr::MultiAddr;
 
 use crate::{
     lease::LeaseArgs,
-    node::util::delete_embedded_node,
-    util::{node_rpc, orchestrator_api::OrchestratorApiBuilder, Rpc},
+    util::{node_rpc, orchestrator_api::OrchestratorApiBuilder},
     CommandGlobalOpts,
 };
 
@@ -54,6 +49,6 @@ async fn run_impl(
     let resp: ListTokensResponse = orchestrator_client.request(req).await?;
 
     // TODO: Create view for listing tokens
-    println!("List tokens.");
+    println!("Tokens: {:?}", resp);
     Ok(())
 }
