@@ -6,7 +6,7 @@ use crate::{
         util::{create_secure_channel_to_authority, create_secure_channel_to_project},
         ProjectInfo,
     },
-    util::{Rpc},
+    util::Rpc,
     CommandGlobalOpts,
 };
 use anyhow::{anyhow, Result};
@@ -16,15 +16,13 @@ use ockam_api::{
     authenticator::direct::{types::OneTimeCode, Client},
     cloud::project::Project,
     config::lookup::ProjectLookup,
-    nodes::models::secure_channel::{
-        CredentialExchangeMode,
-    },
+    nodes::models::secure_channel::CredentialExchangeMode,
     DefaultAddress,
 };
-use ockam_core::api::{RequestBuilder};
-use ockam_identity::{credential::Credential};
-use ockam_multiaddr::{MultiAddr};
-use tracing::{info};
+use ockam_core::api::RequestBuilder;
+use ockam_identity::credential::Credential;
+use ockam_multiaddr::MultiAddr;
+use tracing::info;
 
 use super::RpcBuilder;
 
