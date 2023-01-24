@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use clap::Args;
 use ockam::Context;
-use ockam_api::cloud::lease_manager::models::influxdb::{ShowTokenRequest, ShowTokenResponse};
+use ockam_api::cloud::lease_manager::models::influxdb::Token;
 
 use ockam_core::api::Request;
 use ockam_multiaddr::MultiAddr;
@@ -39,13 +39,13 @@ async fn run_impl(
         .await?
         .build(&MultiAddr::from_str("/service/influxdb_token_lease")?)
         .await?;
-    let body = ShowTokenRequest::new(cmd.token_id.clone());
 
-    let req = Request::get(format!("/{}", cmd.token_id)).body(body);
+    let req = Request::get(format!("/{}", cmd.token_id));
 
-    let resp: ShowTokenResponse = orchestrator_client.request(req).await?;
+    let resp_token: Token = orchestrator_client.request(req).await?;
 
     // TODO: Create view for showing a token
-    println!("Token details: {:?}", resp);
+    println!("Token details: {:?}", resp_token);
+
     Ok(())
 }

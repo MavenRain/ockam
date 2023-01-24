@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use clap::Args;
 use ockam::Context;
-use ockam_api::cloud::lease_manager::models::influxdb::{CreateTokenRequest, CreateTokenResponse};
+use ockam_api::cloud::lease_manager::models::influxdb::Token;
 use ockam_core::api::Request;
 use ockam_multiaddr::MultiAddr;
 
@@ -40,7 +40,7 @@ impl InfluxDbCreateCommand {
 
 async fn run_impl(
     ctx: Context,
-    (opts, lease_args, cmd): (CommandGlobalOpts, LeaseArgs, InfluxDbCreateCommand),
+    (opts, lease_args, _cmd): (CommandGlobalOpts, LeaseArgs, InfluxDbCreateCommand),
 ) -> crate::Result<()> {
     let mut orchestrator_client = OrchestratorApiBuilder::new(&ctx, &opts)
         .as_identity(lease_args.cloud_opts.identity)
@@ -48,21 +48,15 @@ async fn run_impl(
         .await?
         .with_project_from_file(&lease_args.project)
         .await?
-        .build(&MultiAddr::from_str("/service")?)
+        .build(&MultiAddr::from_str("/service/influxdb_token_lease")?)
         .await?;
 
-    let body = CreateTokenRequest::new(
-        cmd.description,
-        cmd.status.map(|s| s.to_string()),
-        cmd.user_id,
-    );
+    let req = Request::post("/");
 
-    let req = Request::post("/lease_manager/influxdb/tokens").body(body);
-
-    let resp: CreateTokenResponse = orchestrator_client.request(req).await?;
+    let resp_token: Token = orchestrator_client.request(req).await?;
 
     // TODO : Create View for showing created token info
-    println!("Token Created: {:?}", resp);
+    println!("Token Created: {:?}", resp_token);
 
     Ok(())
 }
