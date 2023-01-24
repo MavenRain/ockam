@@ -7,6 +7,7 @@ pub mod echoer;
 pub mod error;
 pub mod hop;
 pub mod identity;
+pub mod kafka;
 pub mod nodes;
 pub mod okta;
 pub mod uppercase;

@@ -34,7 +34,6 @@ default              = ["lmdb"]
 bytes           = { version = "1.2.1", default-features = false, features = ["serde"] }
 ockam           = { path = "../ockam", version = "^0.78.0", features = ["software_vault"] }
 either          = { version = "1.7.0", default-features = false }
-ockam_multiaddr = { path = "../ockam_multiaddr", version = "0.12.0", features = ["cbor", "serde"] }
 cddl-cat        = { version = "0.6.1", optional = true }
 hex             = { version = "0.4.3", default-features = false, features = ["alloc", "serde"] }
 nix             = "0.26"
@@ -53,7 +52,15 @@ anyhow          = "1"
 directories     = "4"
 dirs            = "4.0.0"
 thiserror       = "1.0"
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls-native-roots"] }
+reqwest         = { version = "0.11", default-features = false, features = ["json", "rustls-tls-native-roots"] }
+tokio           = { version="1", features = ["full"] }
+tokio-util      = { version = "0.7", features = ["codec"] }
+bytes           = "1"
+kafka-protocol  = "0.4"
+futures         = "0.3"
+
+ockam_multiaddr     = { path = "../ockam_multiaddr", version = "0.12.0", features = ["cbor", "serde"] }
+ockam_transport_tcp = { path = "../ockam_transport_tcp", version = "^0.73.0" }
 
 [dependencies.ockam_core]
 version          = "0.72.0"

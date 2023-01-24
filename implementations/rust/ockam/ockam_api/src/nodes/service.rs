@@ -41,6 +41,7 @@ pub mod message;
 
 mod credentials;
 mod forwarder;
+mod kafka;
 mod policy;
 mod portals;
 mod secure_channel;
@@ -658,6 +659,11 @@ impl NodeManagerWorker {
 
             // ==*== Messages ==*==
             (Post, ["v0", "message"]) => self.send_message(ctx, req, dec).await?,
+
+            // ==*== Kafka commands ==*==
+            (Post, ["kafka", "sidecar", "producer"]) => {
+                self.create_kafka_producer_sidecar(ctx, req, dec).await?
+            }
 
             // ==*== Catch-all for Unimplemented APIs ==*==
             _ => {
