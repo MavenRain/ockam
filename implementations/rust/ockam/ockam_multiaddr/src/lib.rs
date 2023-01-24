@@ -567,7 +567,7 @@ impl MultiAddr {
     }
 
     pub fn concat(self, other: &MultiAddr) -> Result<MultiAddr, Error> {
-        let mut addr = self.clone();
+        let mut addr = self;
 
         addr.concat_mut(other)?;
 

@@ -9,7 +9,7 @@ use crate::{
     util::Rpc,
     CommandGlobalOpts,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Context as _, Result};
 use minicbor::{Decode, Encode};
 use ockam::Context;
 use ockam_api::{
@@ -71,12 +71,7 @@ impl<'a> OrchestratorApiBuilder<'a> {
         Ok(self)
     }
 
-    /// Sets the node to use as the client of the request, without starting one.
-    pub fn with_node(&mut self, node_name: String) -> &mut Self {
-        self.node_name = Some(node_name);
-        self
-    }
-
+    /// Creates and sets a project lookup from a Project Info file
     pub async fn with_project_from_file(
         &mut self,
         file_path: &PathBuf,
@@ -92,6 +87,9 @@ impl<'a> OrchestratorApiBuilder<'a> {
         Ok(self)
     }
 
+    /// Sets the API project look up
+    // TODO: oa: will be used within the enroll flow
+    #[allow(dead_code)]
     pub async fn with_project_from_lookup(
         &mut self,
         proj_name: &str,
@@ -100,17 +98,21 @@ impl<'a> OrchestratorApiBuilder<'a> {
 
         let proj = config_lookup
             .get_project(proj_name)
-            .ok_or(anyhow!("Unknown project {}", proj_name.to_string()))?;
+            .context(format!("Unknown project {}", proj_name.to_string()))?;
 
         self.project_lookup = Some(proj.clone());
         Ok(self)
     }
 
+    // TODO oa: will be used within enroll & auth flow
+    #[allow(dead_code)]
     pub fn to_orchestor_endpoint(&mut self, destination: OrchestratorEndpoint) -> &mut Self {
         self.destination = destination;
         self
     }
 
+    // TODO oa: will be used within enroll flow
+    #[allow(dead_code)]
     pub fn with_credential_exchange(&mut self, cem: CredentialExchangeMode) -> &mut Self {
         self.credential_exchange_mode = cem;
         self
@@ -121,39 +123,24 @@ impl<'a> OrchestratorApiBuilder<'a> {
         self
     }
 
+    // TODO oa: will be used within auth flow
+    #[allow(dead_code)]
     pub fn use_one_time_code(&mut self, otc: OneTimeCode) -> &mut Self {
         self.one_time_code = Some(otc);
         self
     }
 
     pub async fn authenticate(&self) -> Result<Credential<'a>> {
-        let node_name = self.node_name.as_ref().ok_or(anyhow!("Node is required"))?;
-        let project = self
-            .project_lookup
-            .as_ref()
-            .ok_or(anyhow!("Project is required"))?;
-
-        let authority = project
-            .authority
-            .as_ref()
-            .ok_or(anyhow!("Project Authority is required"))?;
-
-        let sc_addr = create_secure_channel_to_authority(
-            self.ctx,
-            self.opts,
-            node_name,
-            authority,
-            authority.address(),
-            self.identity.clone(),
-        )
-        .await?;
+        let sc_addr = self
+            .secure_channel_to(&OrchestratorEndpoint::Authenticator)
+            .await?;
 
         let authenticator_route = {
             let service = MultiAddr::try_from(
                 format!("/service/{}", DefaultAddress::AUTHENTICATOR).as_str(),
             )?;
             let addr = sc_addr.concat(&service)?;
-            ockam_api::multiaddr_to_route(&addr).ok_or(anyhow!("Invalid MultiAddr {}", addr))?
+            ockam_api::multiaddr_to_route(&addr).context(format!("Invalid MultiAddr {addr}"))?
         };
 
         let mut client = Client::new(authenticator_route, self.ctx).await?;
@@ -167,38 +154,12 @@ impl<'a> OrchestratorApiBuilder<'a> {
     }
 
     /// Sends the request and returns  the response
-    pub async fn build(&self, service_address: &MultiAddr) -> anyhow::Result<OrchestratorApi<'a>> {
-        let project = self
-            .project_lookup
-            .as_ref()
-            .ok_or(anyhow!("Project is required"))?;
-        let project_identity = project
-            .identity_id
-            .as_ref()
-            .ok_or(anyhow!("Project should have identity set"))?;
-        let project_route = project
-            .node_route
-            .as_ref()
-            .ok_or(anyhow!("Invalid project node route"))?;
-
-        let node_name = self.node_name.as_ref().ok_or(anyhow!("Node is required"))?;
-
+    pub async fn build(&self, service_address: &MultiAddr) -> Result<OrchestratorApi<'a>> {
         // Authenticate with the project authority node
         let _ = self.authenticate().await?;
 
         //  Establish a secure channel
-        info!("establishing secure channel to {project_route}");
-        let sc_addr = create_secure_channel_to_project(
-            self.ctx,
-            self.opts,
-            node_name,
-            None,
-            project_route,
-            &project_identity.to_string(),
-            self.credential_exchange_mode,
-            self.identity.clone(),
-        )
-        .await?;
+        let sc_addr = self.secure_channel_to(&self.destination).await?;
 
         let to = sc_addr.concat(service_address)?;
         info!(
@@ -206,19 +167,72 @@ impl<'a> OrchestratorApiBuilder<'a> {
             service_address, to
         );
 
+        let node_name = self.node_name.as_ref().context("Node is required")?;
         let rpc = RpcBuilder::new(self.ctx, self.opts, node_name)
             .to(&to)?
             .build();
 
         Ok(OrchestratorApi { rpc })
     }
+
+    async fn secure_channel_to(&self, endpoint: &OrchestratorEndpoint) -> Result<MultiAddr> {
+        let node_name = self.node_name.as_ref().context("Node is required")?;
+        let project = self
+            .project_lookup
+            .as_ref()
+            .context("Project is required")?;
+
+        let addr = match endpoint {
+            OrchestratorEndpoint::Authenticator => {
+                let authority = project
+                    .authority
+                    .as_ref()
+                    .context("Project Authority is required")?;
+
+                create_secure_channel_to_authority(
+                    self.ctx,
+                    self.opts,
+                    node_name,
+                    authority,
+                    authority.address(),
+                    self.identity.clone(),
+                )
+                .await?
+            }
+            OrchestratorEndpoint::Project => {
+                let project_identity = project
+                    .identity_id
+                    .as_ref()
+                    .context("Project should have identity set")?;
+                let project_route = project
+                    .node_route
+                    .as_ref()
+                    .context("Invalid project node route")?;
+
+                create_secure_channel_to_project(
+                    self.ctx,
+                    self.opts,
+                    node_name,
+                    None,
+                    project_route,
+                    &project_identity.to_string(),
+                    self.credential_exchange_mode,
+                    self.identity.clone(),
+                )
+                .await?
+            }
+        };
+
+        Ok(addr)
+    }
 }
 
 pub struct OrchestratorApi<'a> {
     rpc: Rpc<'a>,
 }
+
 impl<'a> OrchestratorApi<'a> {
-    pub async fn request<T, R>(&'a mut self, req: RequestBuilder<'_, T>) -> anyhow::Result<R>
+    pub async fn request<T, R>(&'a mut self, req: RequestBuilder<'_, T>) -> Result<R>
     where
         T: Encode<()>,
         R: Decode<'a, ()>,
