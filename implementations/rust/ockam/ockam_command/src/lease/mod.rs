@@ -1,5 +1,4 @@
 mod create;
-mod influxdb;
 mod list;
 mod revoke;
 mod show;
