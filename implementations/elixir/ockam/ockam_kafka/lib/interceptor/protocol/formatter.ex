@@ -1,4 +1,11 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Formatter do
+  @moduledoc """
+  Base functions for formatting Kafka protocol messages for kafka interceptor.
+
+  Rudimentary implementation of kafka protocol types,
+  only supports some basic types, arrays and tagged fields
+  """
+
   @doc """
   Structured format function.
   Accepts a list of tuples {type, data} and formats a binary
@@ -41,7 +48,7 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Formatter do
     {:ok, <<integer::signed-big-integer-size(32)>>}
   end
 
-  def format_type(:int16, integer) when is_integer(integer) and integer < 32768 do
+  def format_type(:int16, integer) when is_integer(integer) and integer < 32_768 do
     {:ok, <<integer::signed-big-integer-size(16)>>}
   end
 

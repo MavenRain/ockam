@@ -188,13 +188,11 @@ defmodule Ockam.Node do
   end
 
   def stop(pid) when is_pid(pid) do
-    try do
-      GenServer.stop(pid)
-    catch
-      ## It's OK if the worker is already stopped
-      :exit, {:noproc, _} ->
-        :ok
-    end
+    GenServer.stop(pid)
+  catch
+    ## It's OK if the worker is already stopped
+    :exit, {:noproc, _} ->
+      :ok
   end
 
   def stop(address) do

@@ -1,6 +1,9 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Request.Formatter do
-  ## Format Metadata.Request to binary
-  ## Supported api versions 0-12
+  @moduledoc """
+  Kafka protocol request formatter for metadata request
+
+  Supported api versions 0-12
+  """
 
   alias Ockam.Kafka.Interceptor.Protocol.Formatter, as: BaseFormatter
   alias Ockam.Kafka.Interceptor.Protocol.Metadata.Request, as: MetadataRequest

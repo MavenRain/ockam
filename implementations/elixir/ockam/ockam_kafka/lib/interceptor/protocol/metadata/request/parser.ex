@@ -1,12 +1,17 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Request.Parser do
-  ## Parse binary request to Metadata.Request
-  ## Supported api versions 0-12
+  @moduledoc """
+  Kafka protocol request parser for metadata request
+
+  Supported api versions 0-12
+  """
 
   alias Ockam.Kafka.Interceptor.Protocol.Metadata.Request, as: MetadataRequest
   alias Ockam.Kafka.Interceptor.Protocol.Parser, as: BaseParser
 
   require Logger
 
+  @spec parse(api_version :: integer(), data :: binary) ::
+          {:ok, MetadataRequest.t(), rest :: binary()} | {:error, reason :: any()}
   ## The difference between version 0 and 1 is not documented, but version 1 supports
   ## nullable arrays (of length -1)
   def parse(0 = api_version, data) do

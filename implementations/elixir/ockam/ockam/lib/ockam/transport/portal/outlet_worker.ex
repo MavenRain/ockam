@@ -24,7 +24,12 @@ defmodule Ockam.Transport.Portal.OutletWorker do
          {:ok, socket} <- :gen_tcp.connect(target_host, target_port, [{:active, :once}, :binary]) do
       Process.flag(:trap_exit, true)
       :ok = Router.route(Message.reply(msg, state.address, TunnelProtocol.encode(:pong)))
-      {:ok, state |> Map.put(:socket, socket) |> Map.put(:peer, msg.return_route) |> Map.put(:connected, true)}
+
+      {:ok,
+       state
+       |> Map.put(:socket, socket)
+       |> Map.put(:peer, msg.return_route)
+       |> Map.put(:connected, true)}
     else
       error ->
         Logger.error("Error starting outlet: #{inspect(options)} : #{inspect(error)}")
@@ -64,12 +69,14 @@ defmodule Ockam.Transport.Portal.OutletWorker do
   def handle_info({:EXIT, socket, :normal}, %{socket: socket} = state) do
     {:stop, :socket_terminated, state}
   end
+
   ## Linked processes terminating normally should not stop the outlet.
   ## Technically this should not happen
   def handle_info({:EXIT, from, :normal}, state) do
     Logger.warn("Received exit :normal signal from #{inspect(from)}")
     {:noreply, state}
   end
+
   def handle_info({:EXIT, _from, reason}, state) do
     {:stop, reason, state}
   end
@@ -79,12 +86,14 @@ defmodule Ockam.Transport.Portal.OutletWorker do
     Logger.info("Outlet terminate with reason: #{inspect(reason)}, disconnecting")
     :ok = Router.route(%Message{payload: TunnelProtocol.encode(:disconnect), onward_route: peer})
   end
+
   def terminate(reason, _state) do
     Logger.info("Outlet terminate with reason: #{inspect(reason)}, already disconnected")
     :ok
   end
 
-  def handle_protocol_msg(state, :disconnect), do: {:stop, :normal, Map.put(state, :connected, false)}
+  def handle_protocol_msg(state, :disconnect),
+    do: {:stop, :normal, Map.put(state, :connected, false)}
 
   def handle_protocol_msg(state, {:payload, data}) do
     :ok = :gen_tcp.send(state.socket, data)

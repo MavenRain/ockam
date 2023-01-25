@@ -41,6 +41,7 @@ defmodule Ockam.Services.Kafka.Provider do
   def child_spec(:kafka_interceptor, args) do
     interceptor_childspecs(args)
   end
+
   def child_spec(service_name, args) do
     options = service_options(service_name, args)
     mod = service_mod(service_name)
@@ -111,76 +112,108 @@ defmodule Ockam.Services.Kafka.Provider do
     outlet_prefix = Keyword.get(args, :outlet_prefix, "kafka_outlet_")
     authorization = Keyword.get(args, :authorization, [])
 
-    outlet_childspecs = case outlet_args do
-      nil -> []
-      _args ->
-        ## FIXME: handle error
-        {:ok, {bootstrap_host, bootstrap_port}} = case Keyword.fetch(outlet_args, :bootstrap) do
-          {:ok, bootstrap_str} ->
-            Ockam.Transport.TCPAddress.parse_host_port(bootstrap_str)
-          :error ->
-            host = Keyword.get(outlet_args, :bootstrap_host, "localhost")
-            port = Keyword.get(outlet_args, :bootstrap_port, 9092)
-            {:ok, {host, port}}
-        end
-        address = Keyword.get(outlet_args, :address, "kafka_bootstrap")
-        [{Ockam.Session.Spawner, [
-          address: address,
-          worker_mod: Ockam.Transport.Portal.OutletWorker,
-          worker_options: [
-            target_host: bootstrap_host,
-            target_port: bootstrap_port,
-            authorization: authorization
-          ],
-          authorization: authorization
-        ]}]
-    end
-    inlet_childspecs = case inlet_args do
-      nil -> []
-      _args ->
-        bootstrap_port = Keyword.get(inlet_args, :bootstrap_port, 9000)
-        base_port = Keyword.get(inlet_args, :base_port, 9001)
-        allowed_ports = Keyword.get(inlet_args, :allowed_ports, 20)
-        outlet_route = Keyword.get(inlet_args, :outlet_route, [Keyword.get(outlet_args || [], :address, "kafka_bootstrap")])
-        bootstrap_route = [interceptor_address | outlet_route]
-        base_route = Enum.take(bootstrap_route, length(bootstrap_route) - 1)
-        [
-          {
-            Ockam.Transport.Portal.InletListener,
-            [port: bootstrap_port, peer_route: bootstrap_route]},
-          {
-          Ockam.Kafka.Interceptor.InletManager,
-          [base_port, allowed_ports, base_route, outlet_prefix]
-          }
-        ]
-    end
+    outlet_childspecs = outlet_childspecs(outlet_args, authorization)
 
-    interceptor_childspecs = [{Ockam.Session.Spawner,
-    [
-      address: interceptor_address,
-      authorization: authorization,
-      worker_mod: Ockam.Transport.Portal.Interceptor,
-      worker_options: [
-        authorization: authorization,
-        interceptor_mod: Ockam.Kafka.Interceptor,
-        interceptor_options: [
-          ## TODO: move outlet_prefix and base port to a separate config
-          outlet_prefix: outlet_prefix,
-          base_port: Keyword.get(inlet_args || [], :base_port, 9001),
-          response_handlers:
-            case outlet_args do
-              nil -> []
-              _args -> [&Ockam.Kafka.Interceptor.MetadataHandler.outlet_response/3]
-            end
-            ++
-            case inlet_args do
-              nil -> []
-              _args -> [&Ockam.Kafka.Interceptor.MetadataHandler.inlet_response/3]
-            end
-          ]
-        ]
-        ]}]
+    inlet_childspecs =
+      inlet_childspecs(inlet_args, outlet_args, interceptor_address, outlet_prefix)
+
+    interceptor_childspecs = [
+      {Ockam.Session.Spawner,
+       [
+         address: interceptor_address,
+         authorization: authorization,
+         worker_mod: Ockam.Transport.Portal.Interceptor,
+         worker_options: [
+           authorization: authorization,
+           interceptor_mod: Ockam.Kafka.Interceptor,
+           interceptor_options: [
+             ## Options for inlet management
+             handler_options: [
+               outlet_prefix: outlet_prefix,
+               base_port: Keyword.get(inlet_args || [], :base_port, 9001)
+             ],
+             response_handlers:
+               case outlet_args do
+                 nil -> []
+                 _args -> [&Ockam.Kafka.Interceptor.MetadataHandler.outlet_response/3]
+               end ++
+                 case inlet_args do
+                   nil -> []
+                   _args -> [&Ockam.Kafka.Interceptor.MetadataHandler.inlet_response/3]
+                 end
+           ]
+         ]
+       ]}
+    ]
 
     inlet_childspecs ++ outlet_childspecs ++ interceptor_childspecs
+  end
+
+  defp outlet_childspecs(nil, _authorization) do
+    []
+  end
+
+  defp outlet_childspecs(outlet_args, authorization) do
+    ## FIXME: handle error
+    {:ok, {bootstrap_host, bootstrap_port}} =
+      case Keyword.fetch(outlet_args, :bootstrap) do
+        {:ok, bootstrap_str} ->
+          Ockam.Transport.TCPAddress.parse_host_port(bootstrap_str)
+
+        :error ->
+          host = Keyword.get(outlet_args, :bootstrap_host, "localhost")
+          port = Keyword.get(outlet_args, :bootstrap_port, 9092)
+          {:ok, {host, port}}
+      end
+
+    address = Keyword.get(outlet_args, :address, "kafka_bootstrap")
+
+    [
+      {Ockam.Session.Spawner,
+       [
+         address: address,
+         worker_mod: Ockam.Transport.Portal.OutletWorker,
+         worker_options: [
+           target_host: bootstrap_host,
+           target_port: bootstrap_port,
+           authorization: authorization
+         ],
+         authorization: authorization
+       ]}
+    ]
+  end
+
+  defp inlet_childspecs(nil, _outlet_args, _interceptor_address, _outlet_prefix) do
+    []
+  end
+
+  defp inlet_childspecs(
+         inlet_args,
+         outlet_args,
+         interceptor_address,
+         outlet_prefix
+       ) do
+    bootstrap_port = Keyword.get(inlet_args, :bootstrap_port, 9000)
+    base_port = Keyword.get(inlet_args, :base_port, 9001)
+    allowed_ports = Keyword.get(inlet_args, :allowed_ports, 20)
+
+    outlet_route =
+      Keyword.get(inlet_args, :outlet_route, [
+        Keyword.get(outlet_args || [], :address, "kafka_bootstrap")
+      ])
+
+    bootstrap_route = [interceptor_address | outlet_route]
+    base_route = Enum.take(bootstrap_route, length(bootstrap_route) - 1)
+
+    [
+      {
+        Ockam.Transport.Portal.InletListener,
+        [port: bootstrap_port, peer_route: bootstrap_route]
+      },
+      {
+        Ockam.Kafka.Interceptor.InletManager,
+        [base_port, allowed_ports, base_route, outlet_prefix]
+      }
+    ]
   end
 end

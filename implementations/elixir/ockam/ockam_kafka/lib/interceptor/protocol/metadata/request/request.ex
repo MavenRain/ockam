@@ -1,4 +1,7 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Request do
+  @moduledoc """
+  Struct representing kafka metadata request
+  """
   defstruct [
     :api_version,
     :topics,
@@ -9,6 +12,9 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Request do
   ]
 
   defmodule Topic do
+    @moduledoc """
+    Struct representing kafka metadata request topic
+    """
     defstruct [
       :name,
       :topic_id,

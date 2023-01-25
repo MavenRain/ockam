@@ -1,5 +1,12 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Parser do
-  ## Only support metadata API up to version 12
+  @moduledoc """
+  Base functions for parsing Kafka protocol messages for kafka interceptor.
+
+  Rudimentary implementation of kafka protocol,
+  only supports metadata API up to version 12.
+  """
+
+  ## TODO: support schema-based parsing
 
   alias Ockam.Kafka.Interceptor.Protocol.RequestHeader
   alias Ockam.Kafka.Interceptor.Protocol.ResponseHeader
@@ -61,7 +68,6 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Parser do
   def parse_response_data(other, api_version, _data) do
     {:error, {:unsupported_api, {other, api_version}}}
   end
-
 
   def parse_response_correlation_id(data) do
     parse_type(:int32, data)
@@ -287,9 +293,10 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Parser do
   end
 
   defp parse_fields(fields_count, data, prev, acc) do
-    with {:ok, {tag, field}, rest} <- parse_field(data, prev) do
-      parse_fields(fields_count - 1, rest, tag, Map.put(acc, tag, field))
-    else
+    case parse_field(data, prev) do
+      {:ok, {tag, field}, rest} ->
+        parse_fields(fields_count - 1, rest, tag, Map.put(acc, tag, field))
+
       {:error, reason} ->
         {:error, {:parse_field, reason, data, prev, acc}}
     end

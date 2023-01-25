@@ -1,4 +1,7 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Response do
+  @moduledoc """
+  Struct representing kafka metadata response
+  """
   defstruct [
     :api_version,
     :throttle_time_ms,
@@ -11,6 +14,9 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Response do
   ]
 
   defmodule Topic do
+    @moduledoc """
+    Struct representing kafka metadata response topic
+    """
     defstruct [
       :error_code,
       :name,
@@ -22,6 +28,9 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Response do
     ]
 
     defmodule Partition do
+      @moduledoc """
+      Struct representing kafka metadata response partition
+      """
       defstruct [
         :error_code,
         :partition_index,
@@ -36,6 +45,9 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Response do
   end
 
   defmodule Broker do
+    @moduledoc """
+    Struct representing kafka metadata response broker
+    """
     defstruct [
       :node_id,
       :host,

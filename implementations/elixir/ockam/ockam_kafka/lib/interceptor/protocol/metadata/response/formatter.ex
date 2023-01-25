@@ -1,5 +1,9 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Response.Formatter do
-  @api_metadata 3
+  @moduledoc """
+  Kafka protocol response formatter for metadata response
+
+  Supported api versions 0-12
+  """
 
   alias Ockam.Kafka.Interceptor.Protocol.Formatter, as: BaseFormatter
   alias Ockam.Kafka.Interceptor.Protocol.Metadata.Response, as: MetadataResponse
@@ -7,6 +11,8 @@ defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Response.Formatter do
   alias MetadataResponse.Broker
   alias MetadataResponse.Topic
   alias MetadataResponse.Topic.Partition
+
+  @api_metadata 3
 
   ## The difference between version 0 and 1 is not documented, but version 1 supports
   ## nullable arrays (of length -1)

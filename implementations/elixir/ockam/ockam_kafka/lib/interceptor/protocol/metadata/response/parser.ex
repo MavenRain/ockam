@@ -1,12 +1,17 @@
 defmodule Ockam.Kafka.Interceptor.Protocol.Metadata.Response.Parser do
-  ## Parse binary responser to Metadata.Response
-  ## Supported api versions 0-12
+  @moduledoc """
+  Kafka protocol response parser for metadata response
+
+  Supported api versions 0-12
+  """
 
   alias Ockam.Kafka.Interceptor.Protocol.Metadata.Response, as: MetadataResponse
   alias Ockam.Kafka.Interceptor.Protocol.Parser, as: BaseParser
 
   require Logger
 
+  @spec parse(api_version :: integer(), data :: binary) ::
+          {:ok, MetadataResponse.t(), rest :: binary()} | {:error, reason :: any()}
   def parse(0 = api_version, data) do
     with {:ok, brokers, rest} <- parse_brokers(api_version, data),
          {:ok, topics, rest} <- parse_topics(api_version, rest) do

@@ -36,6 +36,7 @@ defmodule Ockam.Transport.Portal.InletListener do
 
   defp accept(lsocket, peer_route) do
     {:ok, socket} = :gen_tcp.accept(lsocket)
+    ## TODO: pass authorization
     {:ok, worker} = Ockam.Transport.Portal.InletWorker.create(peer_route: peer_route)
 
     case Ockam.Node.whereis(worker) do
