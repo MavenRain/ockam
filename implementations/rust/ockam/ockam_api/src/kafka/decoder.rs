@@ -1,8 +1,11 @@
 use crate::kafka::kafka_portal_worker::MAX_KAFKA_MESSAGE_SIZE;
 use bytes::BytesMut;
-use futures::StreamExt;
+use futures::Stream;
+use ockam::compat::tokio;
 use ockam_transport_tcp::MAX_PAYLOAD_SIZE;
-use std::io::ErrorKind;
+use std::io::{Error, ErrorKind};
+use std::pin::Pin;
+use std::task::Poll;
 use tokio::io::{AsyncWriteExt, DuplexStream};
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
@@ -40,15 +43,23 @@ impl KafkaDecoder {
                 Ok(())
             } else {
                 //should always write the full message, we must fail if this isn't the case
-                Err(std::io::Error::new(ErrorKind::BrokenPipe, "partial write"))
+                Err(Error::new(ErrorKind::BrokenPipe, "partial write"))
             }
         } else {
             Err(result.err().unwrap())
         }
     }
 
-    ///returns none if the kafka message is not complete yet
-    pub(crate) async fn read_kafka_message(&mut self) -> Option<Result<BytesMut, std::io::Error>> {
-        self.framed_read_half.next().await
+    ///returns kafka message decoded from the buffer
+    /// if no kafka message is readable with the available buffer None is returned
+    pub(crate) async fn read_kafka_message(&mut self) -> Option<Result<BytesMut, Error>> {
+        let poll = std::future::poll_fn(|context| {
+            match Pin::new(&mut self.framed_read_half).poll_next(context) {
+                Poll::Ready(status) => Poll::Ready(status),
+                Poll::Pending => Poll::Ready(None),
+            }
+        });
+
+        poll.await
     }
 }

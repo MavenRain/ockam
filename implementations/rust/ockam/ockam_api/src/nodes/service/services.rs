@@ -3,6 +3,7 @@ use crate::echoer::Echoer;
 use crate::error::ApiError;
 use crate::hop::Hop;
 use crate::identity::IdentityService;
+use crate::kafka::KafkaPortalListener;
 use crate::nodes::models::services::{
     ServiceList, ServiceStatus, StartAuthenticatedServiceRequest, StartAuthenticatorRequest,
     StartCredentialsService, StartEchoerServiceRequest, StartHopServiceRequest,
@@ -17,7 +18,7 @@ use crate::vault::VaultService;
 use minicbor::Decoder;
 use ockam::{Address, AsyncTryClone, Context, Result};
 use ockam_core::api::{Request, Response, ResponseBuilder};
-use ockam_core::AllowAll;
+use ockam_core::{route, AllowAll};
 
 use super::NodeManagerWorker;
 
@@ -268,6 +269,33 @@ impl NodeManager {
             .insert(addr, OktaIdentityProviderServiceInfo::default());
         Ok(())
     }
+
+    pub(super) async fn start_kafka_producer_service_impl<'a>(
+        &mut self,
+        context: &Context,
+        bind_address: String,
+        target_address: String,
+    ) -> Result<()> {
+        let kafka_portal_address = Address::random_local();
+        let outlet_address = Address::random_local();
+
+        self.tcp_transport
+            .create_inlet(
+                bind_address,
+                route![kafka_portal_address.clone(), outlet_address.clone()],
+                AllowAll,
+            )
+            .await?;
+
+        KafkaPortalListener::start(context, kafka_portal_address).await?;
+
+        self.tcp_transport
+            .create_outlet(outlet_address, target_address, AllowAll)
+            .await?;
+
+        //TODO: add kafka portal to the registry
+        Ok(())
+    }
 }
 
 impl NodeManagerWorker {
@@ -466,14 +494,23 @@ impl NodeManagerWorker {
 
     pub(super) async fn start_kafka_producer_service<'a>(
         &mut self,
-        _ctx: &Context,
+        context: &Context,
         req: &'a Request<'_>,
         dec: &mut Decoder<'_>,
     ) -> Result<Vec<u8>> {
+        let mut node_manager = self.node_manager.write().await;
         let body: StartServiceRequest<StartKafkaProducerRequest> = dec.decode()?;
         let _addr: Address = body.address().into();
         let _body_req = body.request();
-        // TODO: @confluent - start kafka producer service
+
+        node_manager
+            .start_kafka_producer_service_impl(
+                context,
+                "0.0.0.0:4444".into(),
+                "localhost:9092".into(),
+            )
+            .await?;
+
         Ok(Response::ok(req.id()).to_vec()?)
     }
 

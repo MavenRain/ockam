@@ -194,7 +194,7 @@ async fn run_impl(
             let payload =
                 StartKafkaConsumerRequest::new(ip, ports, forwarding_addr, route_to_client);
             let payload = StartServiceRequest::new(payload, &addr);
-            let req = Request::post("/node/services/kafka-consumer").body(payload);
+            let req = Request::post("/node/services/kafka_consumer").body(payload);
             start_service_impl(
                 ctx,
                 &opts,
@@ -216,7 +216,7 @@ async fn run_impl(
             let payload =
                 StartKafkaProducerRequest::new(ip, ports, forwarding_addr, route_to_client);
             let payload = StartServiceRequest::new(payload, &addr);
-            let req = Request::post("/node/services/kafka-producer").body(payload);
+            let req = Request::post("/node/services/kafka_producer").body(payload);
             start_service_impl(
                 ctx,
                 &opts,

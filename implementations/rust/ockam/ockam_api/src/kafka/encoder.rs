@@ -1,6 +1,8 @@
 use crate::kafka::kafka_portal_worker::MAX_KAFKA_MESSAGE_SIZE;
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
+use ockam::compat::tokio;
+use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, DuplexStream};
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
@@ -32,16 +34,23 @@ impl KafkaEncoder {
     ) -> Result<(), std::io::Error> {
         self.framed_write_half
             .send(Bytes::from(kafka_message))
-            .await
+            .await?;
+        self.framed_write_half.flush().await?;
+        Ok(())
     }
 
     pub(crate) async fn read_length_encoded(&mut self) -> Result<Vec<u8>, std::io::Error> {
-        let mut buffer = BytesMut::new();
-        let result = self.read_half.read(&mut buffer).await;
+        let mut buffer = BytesMut::with_capacity(1024);
+        let result = self.read_half.read_buf(&mut buffer).await;
 
         if let Ok(read) = result {
-            assert!(read > 0, "read must be called always after write");
-            Ok(buffer.to_vec())
+            if read == 0 {
+                //we should never read 0 bytes since at least one kafka message must
+                //be written before calling this method
+                Err(std::io::Error::from(ErrorKind::BrokenPipe))
+            } else {
+                Ok(buffer.to_vec())
+            }
         } else {
             Err(result.err().unwrap())
         }
